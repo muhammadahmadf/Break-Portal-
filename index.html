@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BreakDesk — Employee Break Management Portal</title>
+  <meta name="description" content="Professional employee break management portal with real-time tracking, penalty enforcement, and monthly Excel reports.">
+  <link rel="stylesheet" href="styles.css">
+      <link rel="icon" type="image/png" href="favicon.png">
+  <!-- SheetJS for Excel export -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  <!-- Chart.js for analytics -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- Floating background orbs -->
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+<div class="orb orb-3"></div>
+
+<!-- Toast Notifications Container -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- ══════════════════════════════════════════════════
+     LOGIN SCREEN
+══════════════════════════════════════════════════ -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="logo-icon">☕</div>
+      <h1>BreakDesk</h1>
+      <p>Employee Break Management Portal</p>
+    </div>
+
+    <!-- Role Tabs -->
+    <div class="role-tabs">
+      <button class="role-tab active" id="tab-admin" onclick="Auth.selectRole('admin')">🛡️ Admin</button>
+      <button class="role-tab" id="tab-employee" onclick="Auth.selectRole('employee')">👤 Employee</button>
+    </div>
+
+    <!-- Admin Login Form -->
+    <div id="form-admin">
+      <div class="form-group">
+        <label class="form-label">Username</label>
+        <input class="form-input" type="text" id="admin-username" placeholder="admin" autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input class="form-input" type="password" id="admin-password" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <button class="btn btn-primary btn-full" onclick="Auth.loginAdmin()" style="margin-top:8px;">
+        🚀 Sign In as Admin
+      </button>
+    </div>
+
+    <!-- Employee Login Form -->
+    <div id="form-employee" class="hidden">
+      <div class="form-group">
+        <label class="form-label">Employee ID</label>
+        <input class="form-input" type="text" id="emp-login-id" placeholder="e.g. EMP001" autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label class="form-label">PIN (4 digits)</label>
+        <input class="form-input" type="password" id="emp-login-pin" placeholder="••••" maxlength="4" autocomplete="current-password">
+      </div>
+      <button class="btn btn-primary btn-full" onclick="Auth.loginEmployee()" style="margin-top:8px;">
+        🚀 Sign In as Employee
+      </button>
+    </div>
+
+    <p style="text-align:center; margin-top:20px; font-size:12px; color:var(--text-muted);">
+      Default admin: <strong style="color:var(--cyan)">admin</strong> / <strong style="color:var(--cyan)">admin123</strong>
+    </p>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     MAIN APP
+══════════════════════════════════════════════════ -->
+<div id="app" class="hidden">
+
+  <!-- Sidebar -->
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">
+        <div class="logo-icon">☕</div>
+        <div class="sidebar-logo-text">
+          <strong>BreakDesk</strong>
+          <span>Management Portal</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-user" id="sidebar-user-info">
+      <div class="avatar" id="user-avatar">A</div>
+      <div class="sidebar-user-info">
+        <strong id="user-display-name">Admin</strong>
+        <span id="user-role-badge">Administrator</span>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Overview</div>
+      <a class="nav-item" id="nav-dashboard" onclick="App.navigate('dashboard')">
+        <span class="nav-icon">📊</span> Dashboard
+      </a>
+
+      <div class="nav-section-label" id="admin-nav-section">Management</div>
+      <a class="nav-item" id="nav-employees" onclick="App.navigate('employees')">
+        <span class="nav-icon">👥</span> Employees
+      </a>
+      <a class="nav-item" id="nav-breaks" onclick="App.navigate('breaks')">
+        <span class="nav-icon">⏸️</span> Break Tracker
+        <span class="nav-badge hidden" id="active-breaks-badge">0</span>
+      </a>
+      <a class="nav-item" id="nav-penalties" onclick="App.navigate('penalties')">
+        <span class="nav-icon">⚠️</span> Penalties
+        <span class="nav-badge hidden" id="penalties-badge">0</span>
+      </a>
+
+      <div class="nav-section-label">Analytics</div>
+      <a class="nav-item" id="nav-reports" onclick="App.navigate('reports')">
+        <span class="nav-icon">📋</span> Reports
+      </a>
+      <a class="nav-item" id="nav-analytics" onclick="App.navigate('analytics')">
+        <span class="nav-icon">📈</span> Analytics
+      </a>
+
+      <div class="nav-section-label" id="admin-only-nav">Admin</div>
+      <a class="nav-item" id="nav-audit" onclick="App.navigate('audit')">
+        <span class="nav-icon">📝</span> Audit Log
+      </a>
+      <a class="nav-item" id="nav-settings" onclick="App.navigate('settings')">
+        <span class="nav-icon">⚙️</span> Settings
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="logout-btn" onclick="Auth.logout()">
+        <span>🚪</span> Sign Out
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <div class="main-content">
+    <!-- Top Bar -->
+    <header class="topbar">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <button class="hamburger-btn" id="hamburger-btn" onclick="App.toggleSidebar()">☰</button>
+        <span class="topbar-title" id="topbar-title">Dashboard</span>
+      </div>
+      <div class="topbar-actions">
+        <div class="topbar-clock" id="topbar-clock">--:--:--</div>
+        <div id="topbar-alert" class="hidden" style="color:var(--red); font-size:13px; font-weight:700; animation:alertPulse 1.5s infinite;">
+          ⚠️ <span id="topbar-alert-text"></span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Page View Container -->
+    <div id="view-container" class="page-content"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     MODALS
+══════════════════════════════════════════════════ -->
+
+<!-- Employee Modal -->
+<div class="modal-overlay hidden" id="modal-employee">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-employee-title">Add Employee</h3>
+      <button class="modal-close" onclick="Employees.closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="emp-edit-id">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Full Name *</label>
+          <input class="form-input" type="text" id="emp-name" placeholder="John Doe">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Employee ID *</label>
+          <input class="form-input" type="text" id="emp-id" placeholder="EMP001">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Shift Type *</label>
+          <select class="form-input" id="emp-shift-type" onchange="Employees.onShiftChange()">
+            <option value="8">8-Hour Shift</option>
+            <option value="12">12-Hour Shift</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Department</label>
+          <input class="form-input" type="text" id="emp-dept" placeholder="Operations">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Shift Start Time *</label>
+          <input class="form-input" type="time" id="emp-shift-start" value="09:00">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Shift End Time *</label>
+          <input class="form-input" type="time" id="emp-shift-end" value="17:00">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">PIN (4 digits)</label>
+          <input class="form-input" type="text" id="emp-pin" placeholder="1234" maxlength="4">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <select class="form-input" id="emp-status">
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group" id="break-quota-preview">
+        <label class="form-label">Break Quota (auto-assigned)</label>
+        <div id="quota-display" style="padding:12px; background:rgba(0,245,255,0.06); border:1px solid rgba(0,245,255,0.15); border-radius:var(--radius-xs); font-size:13px; color:var(--cyan);">
+          2 breaks: 1×20min + 1×30min
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="Employees.closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="Employees.saveEmployee()">💾 Save Employee</button>
+    </div>
+  </div>
+</div>
+
+<!-- Bulk Import Modal -->
+<div class="modal-overlay hidden" id="modal-import">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>📤 Bulk Import Employees</h3>
+      <button class="modal-close" onclick="Employees.closeImportModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="upload-zone" id="upload-zone" onclick="document.getElementById('csv-file-input').click()"
+           ondragover="Employees.onDragOver(event)" ondragleave="Employees.onDragLeave(event)" ondrop="Employees.onDrop(event)">
+        <div class="upload-zone-icon">📁</div>
+        <h4>Drop CSV/Excel file here</h4>
+        <p>or click to browse — supports .csv and .xlsx files</p>
+      </div>
+      <input type="file" id="csv-file-input" accept=".csv,.xlsx,.xls" class="hidden" onchange="Employees.handleFileSelect(event)">
+
+      <div id="import-preview" class="hidden" style="margin-top:20px;">
+        <div class="alert-banner warning" style="margin-bottom:12px;">
+          ⚠️ Review before importing. Duplicate Employee IDs will be skipped.
+        </div>
+        <div class="table-wrapper report-preview">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th><th>Name</th><th>ID</th><th>Shift</th><th>Start</th><th>End</th><th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="import-preview-body"></tbody>
+          </table>
+        </div>
+        <p style="margin-top:12px; font-size:13px; color:var(--text-secondary);" id="import-count-label"></p>
+      </div>
+
+      <div style="margin-top:20px; padding:16px; background:rgba(0,0,0,0.2); border-radius:var(--radius-xs);">
+        <p style="font-size:13px; font-weight:700; margin-bottom:8px; color:var(--text-secondary);">📋 Expected CSV Columns:</p>
+        <code style="font-size:12px; color:var(--cyan);">name, employee_id, shift_type, shift_start, shift_end, department, pin</code>
+        <button class="btn btn-ghost btn-sm" style="margin-top:10px;" onclick="Employees.downloadTemplate()">⬇️ Download Template</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="Employees.closeImportModal()">Cancel</button>
+      <button class="btn btn-primary" id="confirm-import-btn" onclick="Employees.confirmImport()" disabled>✅ Import All</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Delete Modal -->
+<div class="modal-overlay hidden" id="modal-confirm">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header">
+      <h3 id="modal-confirm-title">Confirm Delete</h3>
+      <button class="modal-close" onclick="App.closeConfirm()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p id="modal-confirm-msg" style="color:var(--text-secondary); font-size:15px;"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="App.closeConfirm()">Cancel</button>
+      <button class="btn btn-danger" id="confirm-action-btn">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- JS Modules -->
+<script src="app.js"></script>
+<script src="auth.js"></script>
+<script src="employees.js"></script>
+<script src="breaks.js"></script>
+<script src="penalties.js"></script>
+<script src="dashboard.js"></script>
+<script src="reports.js"></script>
+<script src="charts.js"></script>
+<script src="notifications.js"></script>
+
+<script>
+  // Bootstrap
+  window.addEventListener('DOMContentLoaded', () => {
+    App.init();
+    // Enter key support for login
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        const activeTab = document.querySelector('.role-tab.active');
+        if (activeTab && document.getElementById('login-screen').style.display !== 'none') {
+          if (activeTab.id === 'tab-admin') Auth.loginAdmin();
+          else Auth.loginEmployee();
+        }
+      }
+    });
+  });
+</script>
+</body>
+</html>
